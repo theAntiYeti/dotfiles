@@ -7,3 +7,6 @@ export XDG_STATE_HOME="${HOME}/.local/state"
 # ZSH respective files
 export HISTFILE="${XDG_STATE_HOME}/zsh/history"
 compinit -d $XDG_CACTHE_HOME/zsh/zcompdump-$ZSH_VERSION
+
+# Editor
+export EDITOR="nvim"
