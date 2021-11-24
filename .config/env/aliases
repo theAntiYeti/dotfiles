@@ -1,0 +1,3 @@
+# Replace vim with neovim
+alias vim="nvim"
+alias vi="nvim"
