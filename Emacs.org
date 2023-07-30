@@ -1,0 +1,491 @@
+#+title Emacs Configuration
+
+* Setting Up The Config
+
+#+PROPERTY: header-args:emacs-lisp :tangle ./init.el
+
+** Set Up Package
+
+#+begin_src emacs-lisp
+
+  ;; Setup package sources
+  (require 'package)
+
+  (setq package-archives '(("melpa" . "https://melpa.org/packages/")
+			   ("org" . "https://orgmode.org/elpa/")
+			   ("elpa". "https://elpa.gnu.org/packages/")))
+
+  (package-initialize)
+  (unless package-archive-contents
+    (package-refresh-contents))
+
+#+end_src
+
+** Set Up Use-Package
+
+#+begin_src emacs-lisp
+
+  (unless (package-installed-p 'use-package)
+    (package-install 'use-package))
+
+  (require 'use-package)
+  
+  (setq use-package-always-ensure t)
+
+#+end_src
+
+#+begin_src emacs-lisp
+
+  (use-package diminish)
+  
+#+end_src
+
+** Set Up Correct Shell-path
+#+begin_src emacs-lisp
+
+  (add-to-list 'exec-path "usr/local/go/bin")
+  
+  ;; Get the correct environment variables for eshell
+  (use-package exec-path-from-shell
+    :config
+    (when (memq window-system '(mac ns x))
+      (exec-path-from-shell-initialize)))
+
+#+end_src
+
+
+* Basic UI Configuration
+
+** UI Rules
+#+begin_src emacs-lisp
+
+  (setq inhibit-startup-message t)
+  (setq custom-file (concat user-emacs-directory "custom.el")) ; Get Custom to go away
+
+  (scroll-bar-mode -1)    ; Disable visual scrollbar
+  (tool-bar-mode -1)      ; Disable toolbar
+  (tooltip-mode -1)       ; Disable tooltips
+  (set-fringe-mode 10)    ; Give breathing room
+
+  (menu-bar-mode -1)
+
+  (setq visible-bell t)   ; Visible bell, no sound
+
+  (setq split-height-threshold nil)    ; Open buffers at horizontal split
+  (setq split-width-threshold 0)
+
+#+end_src
+
+** Line Numbers
+
+#+begin_src emacs-lisp
+
+  ;; Line numbers Globally
+  (global-display-line-numbers-mode t)
+
+  ;;Disable for some modes
+  (dolist (mode '(org-mode-hook
+		  term-mode-hook
+		  eshell-mode-hook
+		  shell-mode-hook))
+    (add-hook mode (lambda () (display-line-numbers-mode 0))))
+
+#+end_src
+
+** Rainbow Delimiters
+
+#+begin_src emacs-lisp
+
+  (use-package rainbow-delimiters
+      :hook (prog-mode . rainbow-delimiters-mode))
+
+#+end_src
+
+** Theme
+
+#+begin_src emacs-lisp
+
+  (use-package doom-themes
+    :config
+    (setq doom-themes-enable-bold t
+	  doom-themes-enable-italic t)
+    (load-theme 'doom-monokai-spectrum t))
+
+#+end_src
+
+** Typography
+
+#+begin_src emacs-lisp
+
+  (setq sentence-end-double-space nil)
+  
+#+end_src
+
+
+* Completion and Help
+
+** Completion Framework
+
+#+begin_src emacs-lisp
+  ;; Fuzzy Search
+  (use-package swiper)
+
+  ;; Completion Framework
+  (use-package ivy
+	:diminish
+	:bind (("C-s" . swiper))
+	:config
+	(ivy-mode 1))
+
+  ;; Information for Ivy
+  (use-package ivy-rich
+    :init
+    (ivy-rich-mode 1))
+
+#+end_src
+
+** Counsel
+
+#+begin_src emacs-lisp
+
+  (use-package counsel
+    :bind (("M-x" . counsel-M-x)
+	   ("C-x b" . counsel-ibuffer)
+	   ("C-M-j" . counsel-switch-buffer)
+	   ("C-x C-f" . counsel-find-file)
+	   ("C-c j" . counsel-git-grep)))
+
+#+end_src
+
+** Better Help (helpful)
+
+#+begin_src emacs-lisp
+
+  (use-package helpful
+    :custom
+    (counsel-describe-function-function #'helpful-callable)
+    (counsel-describe-variable-function #'helpful-variable)
+    :bind
+    ([remap describe-function] . counsel-describe-function)
+    ([remap describe-command] . helpful-command)
+    ([remap describe-variable] . counsel-describe-variable)
+    ([remap describe-key] . helpful-key))
+
+#+end_src
+
+** Show Possible Chord Completions (Which Key)
+
+#+begin_src emacs-lisp
+
+  (use-package which-key
+    :init (which-key-mode)
+    :diminish
+    :config
+    (which-key-setup-side-window-right-bottom)
+    (setq which-key-show-early-on-C-h t))
+
+#+end_src
+
+
+* Keybinding and Menuing
+
+** Keybinding (general)
+
+#+begin_src emacs-lisp
+
+  (use-package general
+    :config
+    (general-create-definer theAntiYeti/leader-keys
+			    :prefix "C-#")
+    (theAntiYeti/leader-keys
+      "t" '(:ignore t :which-key "toggles")))
+
+#+end_src
+
+** Creating Maps (hydra)
+
+#+begin_src emacs-lisp
+
+  (use-package hydra)
+  
+#+end_src
+
+** Window Scale
+
+#+begin_src emacs-lisp
+
+  (defhydra hydra-window-scale (:timeout 4)
+    ("j" shrink-window-horizontally "shrink")
+    ("k" enlarge-window-horizontally "grow")
+    ("f" nil "done" :exit t))
+
+  (theAntiYeti/leader-keys
+    "tw" '(hydra-window-scale/body :which-key "scale window"))
+
+#+end_src
+
+
+* Programming Config
+** Language Server and Referencing
+*** Referencing Setup (xref)
+
+#+begin_src emacs-lisp
+
+  (use-package xref)
+
+  (use-package ivy-xref)
+
+#+end_src
+
+*** Language Server
+
+#+begin_src emacs-lisp
+
+  (defun theAntiYeti/lsp-mode-setup ()
+    (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
+    (lsp-headerline-breadcrumb-mode))
+
+  (use-package lsp-mode
+    :commands (lsp lsp-deferred)
+    :hook (lsp-mode . theAntiYeti/lsp-mode-setup)
+    :init
+    (setq lsp-keymap-prefix "C-c l")
+    :config
+    (lsp-enable-which-key-integration t))
+
+#+end_src
+
+** Magit
+
+#+begin_src emacs-lisp
+
+  ;; Magit Prerequisites
+  (use-package compat)
+
+  (use-package sqlite3)
+
+  ;; Magit
+  (use-package magit
+    :after (compat sqlite3))
+
+  ;; Extra integrations
+  (use-package forge)
+  
+#+end_src
+
+** Projectile
+
+#+begin_src emacs-lisp
+
+  (use-package projectile
+    :diminish
+    :config (projectile-mode)
+    :custom ((projectile-completion-system 'ivy))
+    :bind-keymap
+    ("C-c p" . projectile-command-map)
+    :init
+    (when (file-directory-p "~/code")
+      (setq projectile-project-search-path '("~/code")))
+    (setq projectile-switch-project-action #'projectile-dired))
+
+  (use-package counsel-projectile
+    :config (counsel-projectile-mode))
+
+#+end_src
+
+** Docker
+
+#+begin_src emacs-lisp
+
+  (use-package docker)
+
+  (use-package docker-compose-mode)
+  
+#+end_src
+
+** Languages
+*** Python
+
+#+begin_src emacs-lisp
+
+  (use-package python-mode
+      :mode "\\.py\\'"
+      :custom ((lsp-pylsp-plugins-pylint-enabled t))
+      :hook (python-mode . lsp-deferred))
+
+#+end_src
+
+*** Golang
+
+#+begin_src emacs-lisp
+
+  (defun lsp-go-install-save-hooks ()
+    (add-hook 'before-save-hook #'lsp-format-buffer t t)
+    (add-hook 'before-save-hook #'lsp-organize-imports t t))
+
+  (use-package go-mode
+    :hook ((go-mode . lsp-deferred)
+	   (go-mode . lsp-go-install-save-hooks)))
+
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package go-projectile
+  :diminish
+  :config
+  (go-projectile-tools-add-path)
+  :custom
+  (go-projectile-tools '((gocode    . "github.com/mdempsky/gocode")
+			 (golint    . "golang.org/x/lint/golint")
+			 (godef     . "github.com/rogpeppe/godef")
+			 (errcheck  . "github.com/kisielk/errcheck")
+			 (godoc     . "golang.org/x/tools/cmd/godoc")
+			 (gogetdoc  . "github.com/zmb3/gogetdoc")
+			 (goimports . "golang.org/x/tools/cmd/goimports")
+			 (gorename  . "golang.org/x/tools/cmd/gorename")
+			 (gomvpkg   . "golang.org/x/tools/cmd/gomvpkg")
+			 (guru      . "golang.org/x/tools/cmd/guru"))))
+
+#+end_src
+
+#+begin_src emacs-lisp
+
+  (use-package gotest)
+
+  #+end_src
+
+
+* Org Mode
+** Basic Config
+
+#+begin_src emacs-lisp
+
+  (use-package org
+    :custom
+    (org-confirm-babel-evaluate nil)
+    :config
+    (org-babel-do-load-languages 'org-babel-load-languages
+				 '((python . t)))
+    (setq org-ellipsis " ▾"))
+
+  (use-package org-bullets
+    :after org
+    :hook (org-mode . org-bullets-mode))
+
+  (defun efs/org-mode-visual-fill ()
+    (setq visual-fill-column-width 125
+	  visual-fill-column-center-text t)
+    (visual-fill-column-mode 1))
+
+  (use-package visual-fill-column
+    :hook (org-mode . efs/org-mode-visual-fill))
+
+#+end_src
+
+** Configure Babel Languages
+
+#+begin_src emacs-lisp
+
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((emacs-lisp . t)
+     (python . t)))
+
+  (setq org-confirm-babel-evaluate nil)
+  
+#+end_src
+
+** Structure Templates
+
+#+begin_src emacs-lisp
+
+  ;; Needed for Org >= 9.2
+  (require 'org-tempo)
+
+  (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+  (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+  (add-to-list 'org-structure-template-alist '("py" . "src python"))
+
+#+end_src
+
+** Auto-tangle Configuration Files
+
+#+begin_src emacs-lisp
+
+  ;; Automatically tanlge our Emacs.org configuration when we save
+  (defun theAntiYeti/org-babel-tangle-config ()
+    (when (string-equal (buffer-file-name)
+			(expand-file-name "~/.emacs.d/Emacs.org"))
+      (let ((org-confirm-babel-evaluate nil))
+	(org-babel-tangle))))
+
+  (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'theAntiYeti/org-babel-tangle-config)))
+  
+#+end_src
+
+
+* Armada
+
+#+begin_src emacs-lisp
+
+  (defvar armada-directory "~/code/armada/"
+    "The location of the Armada repository")
+
+  (defvar theAntiYeti/docker-compose-components
+    '("server"
+      "server-pulsar"
+      "executor"
+      "executor-pulsar"
+      "scheduler"
+      "scheduleringester"
+      "eventingester"))
+
+  (defun theAntiYeti/armada--run-shellcommand (command &optional sync)
+    (let ((default-directory armada-directory))
+      (if sync
+	  (shell-command command)
+	(async-shell-command command))))
+
+  (defun theAntiYeti/armada-compose-start-component ()
+    (interactive)
+    (let ((component (ivy-read "component: " theAntiYeti/docker-compose-components)))
+      (theAntiYeti/armada--run-shellcommand (concat "docker-compose -f docker-compose.yaml up -d " component))))
+
+  (defun theAntiYeti/armada-build-bundle ()
+    (interactive)
+    (theAntiYeti/armada--run-shellcommand "mage buildDockers bundle"))
+
+  (defun theAntiYeti/armada-start-localdev ()
+    "Starts the Armada localdev server."
+    (interactive)
+    (theAntiYeti/armada--run-shellcommand "mage LocalDev minimal"))
+
+  (defun theAntiYeti/armada-start-localdev-pulsar ()
+    "Starts the Armada localdev server."
+    (interactive)
+    (theAntiYeti/armada--run-shellcommand "mage LocalDev minimal-pulsar"))
+
+  (defun theAntiYeti/armada-localdev-teardown ()
+    "Destroys the localdev server."
+    (interactive)
+    (theAntiYeti/armada--run-shellcommand "mage LocalDevStop"))
+
+  (defun theAntiYeti/armada-run-integration ()
+    "Creates the queue and runs integration tests."
+    (interactive)
+    (theAntiYeti/armada--run-shellcommand "go run cmd/armadactl/main.go create queue e2e-test-queue" t)
+    (theAntiYeti/armada--run-shellcommand "go run cmd/testsuite/main.go test --tests \"testsuite/testcases/basic/*\" --junit junit.xml"))
+
+  (defhydra theAntiYeti/armada--hydra-group (:timeout 4)
+    ("s" theAntiYeti/armada-start-localdev "Start Minimal")
+    ("b" theAntiYeti/armada-build-bundle "Rebuild bundle")
+    ("p" theAntiYeti/armada-start-localdev-pulsar "Start Pulsar")
+    ("t" theAntiYeti/armada-localdev-teardown "Stop")
+    ("i" theAntiYeti/armada-run-integration "Integration")
+    ("c" theAntiYeti/armada-compose-start-component "Component")
+    ("f" nil "done" :exit t))
+
+  (theAntiYeti/leader-keys
+    "ta" '(theAntiYeti/armada--hydra-group/body :which-key "Armada Commands"))
+
+#+end_src
